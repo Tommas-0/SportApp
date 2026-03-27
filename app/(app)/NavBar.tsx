@@ -116,7 +116,7 @@ export function NavBar() {
   }
 
   return (
-    <nav className="sticky top-0 z-50 border-b border-zinc-800/60 bg-zinc-950/80 backdrop-blur-md">
+    <nav className="sticky top-0 z-50 border-b border-zinc-800/60 bg-zinc-950/80 backdrop-blur-md" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <div className="max-w-4xl mx-auto px-6 h-14 flex items-center justify-between gap-4">
 
         {/* Logo + hamburger */}
