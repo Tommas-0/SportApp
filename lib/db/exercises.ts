@@ -1,7 +1,21 @@
 import { createClient } from "@/lib/supabase/server";
-import type { Exercise, TrackingMode } from "@/types";
+import type { Exercise, GlobalExercise, TrackingMode } from "@/types";
 
-// ─── Lecture ──────────────────────────────────────────────────
+// ─── Exercices globaux ────────────────────────────────────────
+
+export async function getGlobalExercises(): Promise<GlobalExercise[]> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("global_exercises")
+    .select("*, muscle_subgroup:muscle_subgroups(id, slug, name, group_id)")
+    .order("name");
+
+  if (error) throw new Error(error.message);
+  return data as GlobalExercise[];
+}
+
+// ─── Exercices utilisateur ────────────────────────────────────
 
 export async function getExercises(): Promise<Exercise[]> {
   const supabase = await createClient();

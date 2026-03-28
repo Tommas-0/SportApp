@@ -3,7 +3,7 @@
 // ============================================================
 export type MuscleGroup =
   | "chest" | "back" | "shoulders" | "arms"
-  | "legs" | "glutes" | "core" | "cardio" | "full_body" | "other";
+  | "legs" | "glutes" | "core" | "cardio" | "other";
 
 export type ExerciseCategory = "strength" | "cardio" | "flexibility" | "mobility";
 
@@ -15,6 +15,13 @@ export type ExerciseCategory = "strength" | "cardio" | "flexibility" | "mobility
  */
 export type TrackingMode = "reps" | "duration" | "reps_duration";
 
+export type MuscleSubgroup = {
+  id: string;
+  slug: string;
+  name: string;
+  group_id: string;
+};
+
 export type Exercise = {
   id: string;
   user_id: string;
@@ -23,7 +30,9 @@ export type Exercise = {
   category: ExerciseCategory;
   tracking_mode: TrackingMode;
   notes: string | null;
+  subgroup_id: string | null;
   created_at: string;
+  muscle_subgroup?: MuscleSubgroup;
 };
 
 // ============================================================
@@ -69,6 +78,15 @@ export type WorkoutSession = {
   workout_sets?: WorkoutSet[];
 };
 
+export type SetSegment = {
+  id: string;
+  set_id: string;
+  weight_kg: number | null;
+  reps: number | null;
+  order_index: number;
+  created_at: string;
+};
+
 export type WorkoutSet = {
   id: string;
   session_id: string;
@@ -84,6 +102,20 @@ export type WorkoutSet = {
   is_warmup: boolean;
   completed_at: string;
   exercise?: Exercise;
+  set_segments?: SetSegment[];
+};
+
+// Exercice global (partagé entre tous les utilisateurs, lecture seule)
+export type GlobalExercise = {
+  id: string;
+  name: string;
+  muscle_group: MuscleGroup | null;
+  category: ExerciseCategory;
+  tracking_mode: TrackingMode;
+  notes: string | null;
+  subgroup_id: string | null;
+  created_at: string;
+  muscle_subgroup?: MuscleSubgroup;
 };
 
 // ============================================================

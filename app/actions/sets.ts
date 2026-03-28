@@ -5,10 +5,12 @@ import {
   logSet,
   updateSet,
   deleteSet,
+  saveSegments,
   type LogSetInput,
   type UpdateSetInput,
+  type DropsetSegmentInput,
 } from "@/lib/db/sets";
-import type { WorkoutSet } from "@/types";
+import type { WorkoutSet, SetSegment } from "@/types";
 
 type ActionResult<T> =
   | { success: true;  data: T }
@@ -28,11 +30,13 @@ export async function logSetAction(
 
 export async function updateSetAction(
   id: string,
-  input: UpdateSetInput
+  input: UpdateSetInput,
+  sessionId?: string
 ): Promise<ActionResult<WorkoutSet>> {
   try {
     const set = await updateSet(id, input);
     revalidatePath("/sessions/active");
+    if (sessionId) revalidatePath(`/sessions/${sessionId}`);
     return { success: true, data: set };
   } catch (err) {
     return { success: false, error: (err as Error).message };
@@ -48,6 +52,18 @@ export async function deleteSetAction(
     revalidatePath("/sessions/active");
     revalidatePath(`/sessions/${sessionId}`);
     return { success: true, data: undefined };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+export async function saveSegmentsAction(
+  setId:    string,
+  segments: DropsetSegmentInput[]
+): Promise<ActionResult<SetSegment[]>> {
+  try {
+    const data = await saveSegments(setId, segments);
+    return { success: true, data };
   } catch (err) {
     return { success: false, error: (err as Error).message };
   }

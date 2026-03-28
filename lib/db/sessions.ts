@@ -128,6 +128,25 @@ export async function endSession(
   return data;
 }
 
+// ─── Mise à jour ─────────────────────────────────────────────
+
+export async function updateSession(
+  id: string,
+  input: { name?: string; notes?: string | null }
+): Promise<WorkoutSession> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("workout_sessions")
+    .update(input)
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) throw new Error(error.message);
+  return data;
+}
+
 // ─── Suppression ─────────────────────────────────────────────
 
 export async function deleteSession(id: string): Promise<void> {

@@ -1,4 +1,4 @@
-const CACHE_NAME = "sport-tracker-v2";
+const CACHE_NAME = "sport-tracker-v3";
 
 // Assets statiques à toujours mettre en cache
 const STATIC_ASSETS = [
@@ -93,6 +93,25 @@ async function networkFirstWithOfflineFallback(request) {
     return offline ?? new Response("Hors ligne", { status: 503 });
   }
 }
+
+// ─── Notifications locales (timer repos / cardio) ──────────────
+// Le client envoie un message postMessage({type:'NOTIFY', title, body})
+// lorsqu'il ne peut pas afficher new Notification() directement.
+
+self.addEventListener("message", (event) => {
+  if (!event.data || event.data.type !== "NOTIFY") return;
+  const { title, body } = event.data;
+  event.waitUntil(
+    self.registration.showNotification(title ?? "Sport Tracker", {
+      body:    body ?? "",
+      icon:    "/icons/icon-192.png",
+      badge:   "/icons/icon-192.png",
+      vibrate: [200, 100, 200],
+      tag:     "timer-done",         // remplace toute notif précédente du même type
+      renotify: false,
+    })
+  );
+});
 
 // ─── Push notifications ────────────────────────────────────────
 

@@ -3,8 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { createExerciseAction, deleteExerciseAction, getExerciseUsageAction } from "@/app/actions/exercises";
-import { TRACKING_MODE_LABEL, resolveTrackingMode } from "@/lib/exercise-validation";
-import type { Exercise, ExerciseCategory, MuscleGroup, TrackingMode } from "@/types";
+import { resolveTrackingMode } from "@/lib/exercise-validation";
+import type { Exercise, GlobalExercise, ExerciseCategory, MuscleGroup, TrackingMode } from "@/types";
 
 const MUSCLE_GROUPS: { value: MuscleGroup; label: string }[] = [
   { value: "chest",     label: "Pectoraux" },
@@ -15,7 +15,6 @@ const MUSCLE_GROUPS: { value: MuscleGroup; label: string }[] = [
   { value: "glutes",    label: "Fessiers" },
   { value: "core",      label: "Abdos" },
   { value: "cardio",    label: "Cardio" },
-  { value: "full_body", label: "Full body" },
   { value: "other",     label: "Autre" },
 ];
 
@@ -43,8 +42,12 @@ const TRACKING_MODE_BADGE: Record<TrackingMode, { label: string; cls: string }> 
 
 const inputCls = "w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500 transition-colors";
 
-export function ExercisesLibrary({ initial }: { initial: Exercise[] }) {
+export function ExercisesLibrary({ initial, globalExercises = [] }: { initial: Exercise[]; globalExercises?: GlobalExercise[] }) {
   const [exercises,    setExercises]    = useState<Exercise[]>(initial);
+  const [globalTab,       setGlobalTab]       = useState(false);
+  const [globalSearch,    setGlobalSearch]    = useState("");
+  const [globalFilter,    setGlobalFilter]    = useState<MuscleGroup | "all">("all");
+  const [globalSubfilter, setGlobalSubfilter] = useState<string | "all">("all");
   const [showForm,     setShowForm]     = useState(false);
   const [name,         setName]         = useState("");
   const [muscle,       setMuscle]       = useState<MuscleGroup>("other");
@@ -118,6 +121,64 @@ export function ExercisesLibrary({ initial }: { initial: Exercise[] }) {
   const filteredGroups  = filter === "all" ? grouped : { [filter]: grouped[filter] ?? [] };
   const musclesWithData = MUSCLE_GROUPS.filter((g) => grouped[g.value]?.length > 0);
 
+  // Exercices filtrés par recherche seule (pour les compteurs de groupe)
+  const globalBySearch = globalExercises.filter(
+    (ex) => !globalSearch || ex.name.toLowerCase().includes(globalSearch.toLowerCase())
+  );
+  // Compteur par groupe (basé sur recherche uniquement)
+  const globalCountByGroup = globalBySearch.reduce<Record<string, number>>((acc, ex) => {
+    const key = ex.muscle_group ?? "other";
+    acc[key] = (acc[key] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  // Sous-groupes disponibles pour le groupe sélectionné (basés sur recherche + groupe)
+  const globalBySearchAndGroup = globalBySearch.filter(
+    (ex) => globalFilter === "all" || ex.muscle_group === globalFilter
+  );
+  const globalSubgroups = globalFilter === "all" ? [] : Array.from(
+    new Map(
+      globalBySearchAndGroup
+        .filter((ex) => ex.muscle_subgroup)
+        .map((ex) => [ex.muscle_subgroup!.id, ex.muscle_subgroup!])
+    ).values()
+  ).sort((a, b) => a.name.localeCompare(b.name));
+  // Compteur par sous-groupe
+  const globalCountBySubgroup = globalBySearchAndGroup.reduce<Record<string, number>>((acc, ex) => {
+    if (!ex.muscle_subgroup) return acc;
+    acc[ex.muscle_subgroup.id] = (acc[ex.muscle_subgroup.id] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  // Exercices globaux filtrés par recherche + groupe + sous-groupe
+  const filteredGlobal = globalBySearchAndGroup.filter(
+    (ex) => globalSubfilter === "all" || ex.muscle_subgroup?.id === globalSubfilter
+  );
+  const globalGrouped = filteredGlobal.reduce<Record<string, GlobalExercise[]>>((acc, g) => {
+    const key = g.muscle_group ?? "other";
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(g);
+    return acc;
+  }, {});
+  const globalMusclesWithData = MUSCLE_GROUPS.filter(
+    (g) => globalCountByGroup[g.value] != null
+  );
+
+  async function handleImportGlobal(g: GlobalExercise) {
+    const duplicate = exercises.some((e) => e.name.toLowerCase() === g.name.toLowerCase());
+    if (duplicate) { setError(`"${g.name}" est déjà dans ta bibliothèque.`); return; }
+    const result = await createExerciseAction({
+      name:          g.name,
+      muscle_group:  g.muscle_group,
+      category:      g.category,
+      tracking_mode: g.tracking_mode,
+      notes:         null,
+    });
+    if (!result.success) { setError(result.error); return; }
+    setExercises((prev) => [...prev, result.data].sort((a, b) => a.name.localeCompare(b.name)));
+    setGlobalTab(false);
+  }
+
   return (
     <div className="space-y-4">
       {/* Dialog de confirmation de suppression forcée */}
@@ -155,6 +216,123 @@ export function ExercisesLibrary({ initial }: { initial: Exercise[] }) {
           <button onClick={() => setError(null)} className="ml-2 text-red-300 hover:text-white">✕</button>
         </p>
       )}
+
+      {/* Onglets Mes exercices / Bibliothèque */}
+      {globalExercises.length > 0 && (
+        <div className="flex gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-1">
+          <button
+            onClick={() => setGlobalTab(false)}
+            className={`flex-1 text-xs font-medium py-1.5 rounded-lg transition-colors ${
+              !globalTab ? "bg-zinc-700 text-white" : "text-zinc-500 hover:text-zinc-300"
+            }`}
+          >
+            Mes exercices
+          </button>
+          <button
+            onClick={() => setGlobalTab(true)}
+            className={`flex-1 text-xs font-medium py-1.5 rounded-lg transition-colors ${
+              globalTab ? "bg-zinc-700 text-white" : "text-zinc-500 hover:text-zinc-300"
+            }`}
+          >
+            Bibliothèque ({globalExercises.length})
+          </button>
+        </div>
+      )}
+
+      {/* ── TAB : Bibliothèque globale ── */}
+      {globalTab && (
+        <div className="space-y-3">
+          <input
+            type="text"
+            placeholder="Rechercher un exercice…"
+            value={globalSearch}
+            onChange={(e) => setGlobalSearch(e.target.value)}
+            className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
+          />
+
+          {/* Filtres — niveau 1 : groupe musculaire */}
+          <div className="flex flex-wrap gap-1.5">
+            <button
+              onClick={() => { setGlobalFilter("all"); setGlobalSubfilter("all"); }}
+              className={`text-xs px-3 py-1 rounded-full border transition-colors ${
+                globalFilter === "all" ? "bg-orange-600 border-orange-600 text-white" : "border-zinc-700 text-zinc-300 hover:text-white"
+              }`}
+            >
+              Tous <span className={globalFilter === "all" ? "text-orange-200" : "text-zinc-500"}>({globalBySearch.length})</span>
+            </button>
+            {globalMusclesWithData.map((g) => (
+              <button
+                key={g.value}
+                onClick={() => { setGlobalFilter(g.value); setGlobalSubfilter("all"); }}
+                className={`text-xs px-3 py-1 rounded-full border transition-colors ${
+                  globalFilter === g.value ? "bg-orange-600 border-orange-600 text-white" : "border-zinc-700 text-zinc-300 hover:text-white"
+                }`}
+              >
+                {g.label} <span className={globalFilter === g.value ? "text-orange-200" : "text-zinc-500"}>({globalCountByGroup[g.value] ?? 0})</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Filtres — niveau 2 : sous-groupe */}
+          {globalSubgroups.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 pl-1 border-l-2 border-zinc-800">
+              <button
+                onClick={() => setGlobalSubfilter("all")}
+                className={`text-[11px] px-2.5 py-0.5 rounded-full border transition-colors ${
+                  globalSubfilter === "all" ? "bg-zinc-600 border-zinc-600 text-white" : "border-zinc-700 text-zinc-400 hover:text-white"
+                }`}
+              >
+                Tous <span className={globalSubfilter === "all" ? "text-zinc-300" : "text-zinc-600"}>({globalBySearchAndGroup.length})</span>
+              </button>
+              {globalSubgroups.map((sg) => (
+                <button
+                  key={sg.id}
+                  onClick={() => setGlobalSubfilter(sg.id)}
+                  className={`text-[11px] px-2.5 py-0.5 rounded-full border transition-colors ${
+                    globalSubfilter === sg.id ? "bg-zinc-600 border-zinc-600 text-white" : "border-zinc-700 text-zinc-400 hover:text-white"
+                  }`}
+                >
+                  {sg.name} <span className={globalSubfilter === sg.id ? "text-zinc-300" : "text-zinc-600"}>({globalCountBySubgroup[sg.id] ?? 0})</span>
+                </button>
+              ))}
+            </div>
+          )}
+          {MUSCLE_GROUPS.filter((g) => globalGrouped[g.value]?.length).map((g) => (
+            <div key={g.value}>
+              <h2 className="text-[11px] text-zinc-500 uppercase tracking-wide mb-2">{g.label}</h2>
+              <div className="border border-zinc-800 bg-zinc-900/60 rounded-xl overflow-hidden divide-y divide-zinc-800/80">
+                {globalGrouped[g.value]!.map((ex) => {
+                  const alreadyOwned = exercises.some((e) => e.name.toLowerCase() === ex.name.toLowerCase());
+                  return (
+                    <div key={ex.id} className="flex items-center justify-between px-4 py-3">
+                      <div className="min-w-0">
+                        <p className="text-sm text-white truncate">{ex.name}</p>
+                        <span className="text-[10px] text-zinc-600">
+                          {ex.muscle_subgroup ? `${ex.muscle_subgroup.name} · ` : ""}
+                          {ex.tracking_mode === "duration" ? "⏱ Durée" : ex.tracking_mode === "reps_duration" ? "⏱+Rep" : "Reps"}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => handleImportGlobal(ex)}
+                        disabled={alreadyOwned}
+                        className="text-xs text-orange-400 hover:text-orange-300 disabled:text-zinc-600 disabled:cursor-default transition-colors shrink-0 ml-3"
+                      >
+                        {alreadyOwned ? "Déjà ajouté" : "+ Ajouter"}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+          {filteredGlobal.length === 0 && (
+            <p className="text-zinc-600 text-sm text-center py-6">Aucun résultat.</p>
+          )}
+        </div>
+      )}
+
+      {/* ── TAB : Mes exercices (contenu principal) ── */}
+      {!globalTab && <>
 
       {/* Filtres */}
       <div className="flex flex-wrap gap-1.5">
@@ -299,6 +477,8 @@ export function ExercisesLibrary({ initial }: { initial: Exercise[] }) {
           ))}
         </div>
       )}
+
+      </> /* fin !globalTab */}
     </div>
   );
 }

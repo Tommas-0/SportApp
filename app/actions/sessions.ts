@@ -7,6 +7,7 @@ import {
   startFreeSession,
   endSession,
   deleteSession,
+  updateSession,
   createManualSession,
 } from "@/lib/db/sessions";
 import type { WorkoutSession, ManualSessionInput } from "@/types";
@@ -38,6 +39,20 @@ export async function endSessionAction(
     revalidatePath(`/sessions/${id}`);
     revalidatePath("/records");
     revalidatePath("/progress");
+    return { success: true, data: session };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+export async function updateSessionAction(
+  id: string,
+  input: { name?: string; notes?: string | null }
+): Promise<ActionResult<WorkoutSession>> {
+  try {
+    const session = await updateSession(id, input);
+    revalidatePath("/sessions");
+    revalidatePath(`/sessions/${id}`);
     return { success: true, data: session };
   } catch (err) {
     return { success: false, error: (err as Error).message };

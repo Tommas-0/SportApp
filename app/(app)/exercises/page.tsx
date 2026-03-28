@@ -1,8 +1,11 @@
-import { getExercises } from "@/lib/db/exercises";
+import { getExercises, getGlobalExercises } from "@/lib/db/exercises";
 import { ExercisesLibrary } from "@/components/exercises/ExercisesLibrary";
 
 export default async function ExercisesPage() {
-  const exercises = await getExercises();
+  const [exercises, globalExercises] = await Promise.all([
+    getExercises(),
+    getGlobalExercises().catch(() => []),
+  ]);
 
   return (
     <>
@@ -16,7 +19,7 @@ export default async function ExercisesPage() {
           <h1 className="text-lg font-semibold text-white">Exercices</h1>
           <p className="text-xs text-zinc-600 mt-0.5">{exercises.length} exercice{exercises.length > 1 ? "s" : ""}</p>
         </div>
-        <ExercisesLibrary initial={exercises} />
+        <ExercisesLibrary initial={exercises} globalExercises={globalExercises} />
       </div>
     </>
   );

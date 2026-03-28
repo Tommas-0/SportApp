@@ -334,7 +334,7 @@ export function CaloriesTracker({
           Saisir les calories
         </p>
         <form onSubmit={handleSubmit} className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="text-[11px] text-zinc-500 block mb-1">Date</label>
               <input

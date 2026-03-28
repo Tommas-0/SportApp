@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { assertValidSetMetrics } from "@/lib/exercise-validation";
-import type { WorkoutSet, TrackingMode } from "@/types";
+import type { WorkoutSet, SetSegment, TrackingMode } from "@/types";
 
 // ─── Lecture ──────────────────────────────────────────────────
 
@@ -33,6 +33,12 @@ export async function getSetsByExercise(exerciseId: string): Promise<WorkoutSet[
 
 // ─── Enregistrement d'une série ──────────────────────────────
 
+export type DropsetSegmentInput = {
+  weight_kg:   number | null;
+  reps:        number | null;
+  order_index: number;
+};
+
 export type LogSetInput = {
   session_id:        string;
   exercise_id:       string;
@@ -47,10 +53,12 @@ export type LogSetInput = {
   resistance_level?: number;
   rpe?:              number;
   is_warmup?:        boolean;
+  /** Segments dropset (optionnel — si absent, comportement classique) */
+  segments?:         DropsetSegmentInput[];
 };
 
 export async function logSet(input: LogSetInput): Promise<WorkoutSet> {
-  const { tracking_mode, speed_kmh, incline_pct, resistance_level, ...rest } = input;
+  const { tracking_mode, speed_kmh, incline_pct, resistance_level, segments, ...rest } = input;
 
   // Validation métier avant tout accès base
   assertValidSetMetrics(tracking_mode, {
@@ -89,7 +97,61 @@ export async function logSet(input: LogSetInput): Promise<WorkoutSet> {
   }
 
   if (error) throw new Error(error.message);
+
+  // Enregistrer les segments dropset si fournis (≥ 2 segments)
+  if (segments && segments.length >= 2) {
+    const supabaseForSegments = await createClient();
+    await supabaseForSegments
+      .from("set_segments")
+      .insert(segments.map((seg) => ({ ...seg, set_id: data.id })));
+    data.set_segments = segments.map((seg, i) => ({
+      id: `pending-${i}`,
+      set_id: data.id,
+      ...seg,
+      created_at: new Date().toISOString(),
+    }));
+  }
+
   return data;
+}
+
+// ─── Segments dropset ─────────────────────────────────────────
+
+export async function getSegmentsBySetIds(setIds: string[]): Promise<Record<string, SetSegment[]>> {
+  if (!setIds.length) return {};
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("set_segments")
+    .select("*")
+    .in("set_id", setIds)
+    .order("order_index");
+
+  if (error) throw new Error(error.message);
+
+  const result: Record<string, SetSegment[]> = {};
+  for (const seg of data) {
+    if (!result[seg.set_id]) result[seg.set_id] = [];
+    result[seg.set_id].push(seg as SetSegment);
+  }
+  return result;
+}
+
+export async function saveSegments(setId: string, segments: DropsetSegmentInput[]): Promise<SetSegment[]> {
+  const supabase = await createClient();
+
+  // Supprimer les anciens segments puis réinsérer
+  await supabase.from("set_segments").delete().eq("set_id", setId);
+
+  if (!segments.length) return [];
+
+  const { data, error } = await supabase
+    .from("set_segments")
+    .insert(segments.map((seg) => ({ ...seg, set_id: setId })))
+    .select();
+
+  if (error) throw new Error(error.message);
+  return data as SetSegment[];
 }
 
 // ─── Mise à jour / suppression ────────────────────────────────

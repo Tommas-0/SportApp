@@ -6,7 +6,7 @@ import {
   getBestWeightsForExercises,
   getBestDurationsForExercises,
 } from "@/lib/db/sets";
-import { getExercises } from "@/lib/db/exercises";
+import { getExercises, getGlobalExercises } from "@/lib/db/exercises";
 import { ActiveSession } from "@/components/sessions/ActiveSession";
 
 export default async function ActiveSessionPage({
@@ -23,11 +23,12 @@ export default async function ActiveSessionPage({
   const templateExercises = template?.template_exercises ?? [];
   const exerciseIds       = templateExercises.map((te) => te.exercise_id);
 
-  const [lastSets, bestWeights, bestDurations, allExercises] = await Promise.all([
+  const [lastSets, bestWeights, bestDurations, allExercises, globalExercises] = await Promise.all([
     getLastSetsForExercises(exerciseIds, id),
     getBestWeightsForExercises(exerciseIds),
     getBestDurationsForExercises(exerciseIds),
     getExercises(),
+    getGlobalExercises().catch(() => []),  // graceful fallback si migration pas encore appliquée
   ]);
 
   return (
@@ -38,6 +39,7 @@ export default async function ActiveSessionPage({
       bestWeights={bestWeights}
       bestDurations={bestDurations}
       allExercises={allExercises}
+      globalExercises={globalExercises}
     />
   );
 }

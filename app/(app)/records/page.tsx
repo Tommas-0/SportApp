@@ -10,11 +10,10 @@ const MUSCLE_LABEL: Record<string, string> = {
   glutes:    "Fessiers",
   core:      "Abdos",
   cardio:    "Cardio",
-  full_body: "Full body",
   other:     "Autre",
 };
 
-const MUSCLE_ORDER = ["chest","back","shoulders","arms","legs","glutes","core","cardio","full_body","other"];
+const MUSCLE_ORDER = ["chest","back","shoulders","arms","legs","glutes","core","cardio","other"];
 
 export default async function RecordsPage() {
   const [records, cardioRecords] = await Promise.all([

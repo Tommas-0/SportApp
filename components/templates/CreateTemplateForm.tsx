@@ -26,7 +26,6 @@ const MUSCLE_GROUPS: { value: MuscleGroup; label: string }[] = [
   { value: "glutes",    label: "Fessiers" },
   { value: "core",      label: "Abdos" },
   { value: "cardio",    label: "Cardio" },
-  { value: "full_body", label: "Full body" },
   { value: "other",     label: "Autre" },
 ];
 

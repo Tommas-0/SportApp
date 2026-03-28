@@ -11,7 +11,7 @@ import type { Exercise, TrackingMode, MuscleGroup, ManualSetInput } from "@/type
 const MUSCLE_LABEL: Record<MuscleGroup, string> = {
   chest: "Pectoraux", back: "Dos", shoulders: "Épaules", arms: "Bras",
   legs: "Jambes", glutes: "Fessiers", core: "Abdos", cardio: "Cardio",
-  full_body: "Full body", other: "Autre",
+  other: "Autre",
 };
 
 // ─── Types locaux ─────────────────────────────────────────────
@@ -83,77 +83,99 @@ function SetRowInput({
     onChange({ ...set, [field]: val });
 
   return (
-    <div className={`flex flex-wrap gap-2 items-center rounded-xl px-3 py-2.5 ${
+    <div className={`rounded-xl px-3 py-2.5 space-y-2 ${
       set.is_warmup ? "bg-zinc-800/30" : "bg-zinc-800/60"
     }`}>
-      <span className="text-[10px] text-zinc-600 w-4 shrink-0">{idx + 1}</span>
-
-      {(mode === "reps" || mode === "reps_duration") && (
-        <>
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] text-zinc-600 w-4 shrink-0">{idx + 1}</span>
+        <div className="flex-1 grid grid-cols-2 gap-2">
           {mode === "reps" && (
+            <>
+              <input
+                type="number"
+                value={set.weight_kg}
+                onChange={(e) => u("weight_kg", e.target.value)}
+                placeholder="Poids kg"
+                min="0"
+                step="0.5"
+                className="w-full bg-zinc-700 rounded-lg px-2 py-1.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+              />
+              <input
+                type="number"
+                value={set.reps}
+                onChange={(e) => u("reps", e.target.value)}
+                placeholder="Reps"
+                min="1"
+                className="w-full bg-zinc-700 rounded-lg px-2 py-1.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+              />
+            </>
+          )}
+          {mode === "reps_duration" && (
+            <>
+              <input
+                type="number"
+                value={set.reps}
+                onChange={(e) => u("reps", e.target.value)}
+                placeholder="Reps"
+                min="1"
+                className="w-full bg-zinc-700 rounded-lg px-2 py-1.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+              />
+              <input
+                type="number"
+                value={set.duration_min}
+                onChange={(e) => u("duration_min", e.target.value)}
+                placeholder="Durée (min)"
+                min="0"
+                step="0.5"
+                className="w-full bg-zinc-700 rounded-lg px-2 py-1.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+              />
+            </>
+          )}
+          {mode === "duration" && (
             <input
               type="number"
-              value={set.weight_kg}
-              onChange={(e) => u("weight_kg", e.target.value)}
-              placeholder="Poids kg"
+              value={set.duration_min}
+              onChange={(e) => u("duration_min", e.target.value)}
+              placeholder="Durée (min)"
               min="0"
               step="0.5"
-              className="flex-1 min-w-[80px] bg-zinc-700 rounded-lg px-2 py-1.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+              className="col-span-2 w-full bg-zinc-700 rounded-lg px-2 py-1.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
             />
           )}
-          <input
-            type="number"
-            value={set.reps}
-            onChange={(e) => u("reps", e.target.value)}
-            placeholder="Reps"
-            min="1"
-            className="flex-1 min-w-[60px] bg-zinc-700 rounded-lg px-2 py-1.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
-          />
-        </>
-      )}
-
-      {(mode === "duration" || mode === "reps_duration") && (
+        </div>
         <input
           type="number"
-          value={set.duration_min}
-          onChange={(e) => u("duration_min", e.target.value)}
-          placeholder="Durée (min)"
-          min="0"
+          value={set.rpe}
+          onChange={(e) => u("rpe", e.target.value)}
+          placeholder="RPE"
+          min="1"
+          max="10"
           step="0.5"
-          className="flex-1 min-w-[90px] bg-zinc-700 rounded-lg px-2 py-1.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+          className="w-14 bg-zinc-700 rounded-lg px-2 py-1.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
         />
-      )}
+      </div>
 
-      <input
-        type="number"
-        value={set.rpe}
-        onChange={(e) => u("rpe", e.target.value)}
-        placeholder="RPE"
-        min="1"
-        max="10"
-        step="0.5"
-        className="w-16 bg-zinc-700 rounded-lg px-2 py-1.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
-      />
+      <div className="flex items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={() => u("is_warmup", !set.is_warmup)}
+          className={`text-[10px] px-2 py-1 rounded-lg border transition-colors ${
+            set.is_warmup
+              ? "border-amber-500/50 bg-amber-950/30 text-amber-400"
+              : "border-zinc-600 text-zinc-500 hover:border-amber-500/50"
+          }`}
+        >
+          Chauffe
+        </button>
 
-      <button
-        type="button"
-        onClick={() => u("is_warmup", !set.is_warmup)}
-        className={`text-[10px] px-2 py-1 rounded-lg border transition-colors ${
-          set.is_warmup
-            ? "border-amber-500/50 bg-amber-950/30 text-amber-400"
-            : "border-zinc-600 text-zinc-500 hover:border-amber-500/50"
-        }`}
-      >
-        Chauffe
-      </button>
-
-      <button
-        type="button"
-        onClick={onRemove}
-        className="text-zinc-600 hover:text-red-400 transition-colors text-sm px-1"
-      >
-        ✕
-      </button>
+        <button
+          type="button"
+          onClick={onRemove}
+          className="text-zinc-600 hover:text-red-400 transition-colors text-sm px-1"
+        >
+          ✕
+        </button>
+      </div>
     </div>
   );
 }

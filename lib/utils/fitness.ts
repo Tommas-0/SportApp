@@ -218,7 +218,6 @@ function strengthMET(muscleGroup: string | null | undefined): number {
     case "glutes":    return 5.5;
     case "back":
     case "chest":     return 5.0;
-    case "full_body": return 6.0;
     case "shoulders":
     case "arms":
     case "core":
@@ -226,8 +225,8 @@ function strengthMET(muscleGroup: string | null | undefined): number {
   }
 }
 
-function cardioMET(muscleGroup: string | null | undefined): number {
-  return muscleGroup === "full_body" ? 8.5 : 7.5;
+function cardioMET(_muscleGroup: string | null | undefined): number {
+  return 7.5;
 }
 
 /**
@@ -289,6 +288,33 @@ export function calculateSetKcal(set: SetKcalInput, bodyweightKg: number): numbe
   const metabolic   = met * bodyweightKg * (reps * 3 / 3600);
   const mechanical  = load * reps * 0.0005;
   return Math.round((metabolic + mechanical) * 10) / 10;
+}
+
+export type SegmentKcalInput = {
+  weight_kg: number | null;
+  reps:      number | null;
+};
+
+/**
+ * Calcule les kcal d'un dropset (plusieurs segments enchaînés).
+ * Chaque segment est une série reps-based (mode strength).
+ */
+export function calculateDropsetKcal(
+  segments:     SegmentKcalInput[],
+  muscleGroup:  string | null | undefined,
+  bodyweightKg: number
+): number {
+  const met = strengthMET(muscleGroup);
+  return Math.round(
+    segments.reduce((sum, seg) => {
+      const reps = seg.reps ?? 0;
+      if (reps <= 0) return sum;
+      const load       = Number(seg.weight_kg) || 0;
+      const metabolic  = met * bodyweightKg * (reps * 3 / 3600);
+      const mechanical = load * reps * 0.0005;
+      return sum + metabolic + mechanical;
+    }, 0) * 10
+  ) / 10;
 }
 
 /**
