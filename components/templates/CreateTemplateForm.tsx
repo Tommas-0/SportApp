@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createTemplateAction, updateTemplateAction, upsertTemplateExercisesAction } from "@/app/actions/templates";
 import { createExerciseAction } from "@/app/actions/exercises";
-import type { Exercise, MuscleGroup, TemplateExercise, WorkoutTemplate } from "@/types";
+import type { Exercise, GlobalExercise, MuscleGroup, TemplateExercise, WorkoutTemplate } from "@/types";
 
 type ExerciseRow = {
   exercise_id: string;
@@ -33,8 +33,9 @@ const inputCls = "w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2
 const labelCls = "block text-[11px] text-zinc-500 uppercase tracking-wide mb-1";
 
 type Props = {
-  exercises: Exercise[];
-  template?: WorkoutTemplate;
+  exercises:          Exercise[];
+  globalExercises?:   GlobalExercise[];
+  template?:          WorkoutTemplate;
   templateExercises?: TemplateExercise[];
 };
 
@@ -51,7 +52,7 @@ function teToRow(te: TemplateExercise): ExerciseRow {
   };
 }
 
-export function CreateTemplateForm({ exercises, template, templateExercises }: Props) {
+export function CreateTemplateForm({ exercises, globalExercises = [], template, templateExercises }: Props) {
   const router = useRouter();
   const isEdit = !!template;
 
@@ -62,8 +63,9 @@ export function CreateTemplateForm({ exercises, template, templateExercises }: P
       ? [...templateExercises].sort((a, b) => a.order_index - b.order_index).map(teToRow)
       : []
   );
-  const [error,   setError]   = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [error,         setError]         = useState<string | null>(null);
+  const [loading,       setLoading]       = useState(false);
+  const [importingGlob, setImportingGlob] = useState(false);
 
   const [showNewEx,   setShowNewEx]   = useState(false);
   const [newExName,   setNewExName]   = useState("");
@@ -81,6 +83,23 @@ export function CreateTemplateForm({ exercises, template, templateExercises }: P
     addRow(result.data);
     setNewExName("");
     setShowNewEx(false);
+  }
+
+  async function handleAddGlobal(globalId: string) {
+    const g = globalExercises.find((x) => x.id === globalId);
+    if (!g) return;
+    setImportingGlob(true);
+    const result = await createExerciseAction({
+      name:          g.name,
+      muscle_group:  g.muscle_group,
+      category:      g.category,
+      tracking_mode: g.tracking_mode,
+      notes:         null,
+    });
+    setImportingGlob(false);
+    if (!result.success) { setError(result.error); return; }
+    setAllExercises((prev) => [...prev, result.data].sort((a, b) => a.name.localeCompare(b.name)));
+    addRow(result.data);
   }
 
   function addRow(ex: Exercise) {
@@ -216,17 +235,48 @@ export function CreateTemplateForm({ exercises, template, templateExercises }: P
           </div>
         ))}
 
-        {/* Ajouter existant */}
-        {unusedExercises.length > 0 && (
-          <select
-            className={`${inputCls} text-zinc-500`}
-            value=""
-            onChange={(e) => { const ex = allExercises.find((x) => x.id === e.target.value); if (ex) addRow(ex); }}
-          >
-            <option value="" disabled>+ Ajouter un exercice existant…</option>
-            {unusedExercises.map((ex) => <option key={ex.id} value={ex.id}>{ex.name}</option>)}
-          </select>
-        )}
+        {/* Ajouter existant ou global */}
+        {(() => {
+          const unusedGlobal = globalExercises.filter(
+            (g) => !allExercises.some((e) => e.name.toLowerCase() === g.name.toLowerCase())
+                && !rows.some((r) => r.name.toLowerCase() === g.name.toLowerCase())
+          );
+          if (unusedExercises.length === 0 && unusedGlobal.length === 0) return null;
+          return (
+            <select
+              className={`${inputCls} text-zinc-500`}
+              value=""
+              disabled={importingGlob}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val.startsWith("global_")) {
+                  handleAddGlobal(val.slice(7));
+                } else {
+                  const ex = allExercises.find((x) => x.id === val);
+                  if (ex) addRow(ex);
+                }
+              }}
+            >
+              <option value="" disabled>
+                {importingGlob ? "Import en cours…" : "+ Ajouter un exercice…"}
+              </option>
+              {unusedExercises.length > 0 && (
+                <optgroup label="Mes exercices">
+                  {unusedExercises.map((ex) => (
+                    <option key={ex.id} value={ex.id}>{ex.name}</option>
+                  ))}
+                </optgroup>
+              )}
+              {unusedGlobal.length > 0 && (
+                <optgroup label="Bibliothèque globale">
+                  {unusedGlobal.map((g) => (
+                    <option key={g.id} value={`global_${g.id}`}>{g.name}</option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
+          );
+        })()}
 
         {/* Créer nouveau exercice */}
         {!showNewEx ? (

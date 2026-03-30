@@ -3,8 +3,9 @@
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { createManualSessionAction } from "@/app/actions/sessions";
+import { createExerciseAction } from "@/app/actions/exercises";
 import { calculateSetKcal } from "@/lib/utils/fitness";
-import type { Exercise, TrackingMode, MuscleGroup, ManualSetInput } from "@/types";
+import type { Exercise, GlobalExercise, TrackingMode, MuscleGroup, ManualSetInput } from "@/types";
 
 // ─── Constantes ───────────────────────────────────────────────
 
@@ -184,25 +185,39 @@ function SetRowInput({
 
 export function ManualSessionForm({
   exercises,
+  globalExercises = [],
   weightKg = 70,
 }: {
-  exercises: Exercise[];
-  weightKg?: number;
+  exercises:       Exercise[];
+  globalExercises?: GlobalExercise[];
+  weightKg?:       number;
 }) {
   const router = useRouter();
 
-  const [name,         setName]         = useState("");
-  const [date,         setDate]         = useState(new Date().toISOString().slice(0, 10));
-  const [notes,        setNotes]        = useState("");
-  const [entries,      setEntries]      = useState<ExerciseEntry[]>([]);
-  const [selectedExId, setSelectedExId] = useState("");
-  const [saving,       setSaving]       = useState(false);
-  const [error,        setError]        = useState<string | null>(null);
+  const [name,            setName]            = useState("");
+  const [date,            setDate]            = useState(new Date().toISOString().slice(0, 10));
+  const [notes,           setNotes]           = useState("");
+  const [entries,         setEntries]         = useState<ExerciseEntry[]>([]);
+  const [selectedExId,    setSelectedExId]    = useState("");
+  const [saving,          setSaving]          = useState(false);
+  const [error,           setError]           = useState<string | null>(null);
+  const [allUserExercises, setAllUserExercises] = useState<Exercise[]>(exercises);
+  const [importingGlobal, setImportingGlobal] = useState(false);
 
-  // Exercices non encore ajoutés à la séance
-  const availableExercises = useMemo(
-    () => exercises.filter((ex) => !entries.some((e) => e.exercise.id === ex.id)),
-    [exercises, entries]
+  // Exercices utilisateur non encore ajoutés à la séance
+  const availableUserExercises = useMemo(
+    () => allUserExercises.filter((ex) => !entries.some((e) => e.exercise.id === ex.id)),
+    [allUserExercises, entries]
+  );
+
+  // Exercices globaux non encore dans la bibliothèque perso ni dans la séance
+  const availableGlobalExercises = useMemo(
+    () => globalExercises.filter(
+      (g) =>
+        !allUserExercises.some((e) => e.name.toLowerCase() === g.name.toLowerCase()) &&
+        !entries.some((e) => e.exercise.name.toLowerCase() === g.name.toLowerCase())
+    ),
+    [globalExercises, allUserExercises, entries]
   );
 
   const kcalPreview = useMemo(
@@ -210,8 +225,28 @@ export function ManualSessionForm({
     [entries, weightKg]
   );
 
-  function addExercise() {
-    const ex = exercises.find((e) => e.id === selectedExId);
+  async function addExercise() {
+    // Exercice global (pas encore importé) : préfixe "global_"
+    if (selectedExId.startsWith("global_")) {
+      const globalId = selectedExId.slice(7);
+      const g = globalExercises.find((x) => x.id === globalId);
+      if (!g) return;
+      setImportingGlobal(true);
+      const result = await createExerciseAction({
+        name:          g.name,
+        muscle_group:  g.muscle_group,
+        category:      g.category,
+        tracking_mode: g.tracking_mode,
+        notes:         null,
+      });
+      setImportingGlobal(false);
+      if (!result.success) { setError(result.error); return; }
+      setAllUserExercises((prev) => [...prev, result.data].sort((a, b) => a.name.localeCompare(b.name)));
+      setEntries((prev) => [...prev, { exercise: result.data, sets: [emptySet()] }]);
+      setSelectedExId("");
+      return;
+    }
+    const ex = allUserExercises.find((e) => e.id === selectedExId);
     if (!ex) return;
     setEntries((prev) => [...prev, { exercise: ex, sets: [emptySet()] }]);
     setSelectedExId("");
@@ -351,36 +386,57 @@ export function ManualSessionForm({
           <select
             value={selectedExId}
             onChange={(e) => setSelectedExId(e.target.value)}
-            className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500"
+            className="flex-1 min-w-0 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500"
           >
             <option value="">Choisir un exercice…</option>
-            {Object.entries(
-              availableExercises.reduce<Record<string, Exercise[]>>((acc, ex) => {
-                const g = ex.muscle_group ?? "other";
-                acc[g] = [...(acc[g] ?? []), ex];
-                return acc;
-              }, {})
-            ).map(([group, exs]) => (
-              <optgroup key={group} label={MUSCLE_LABEL[group as MuscleGroup] ?? group}>
-                {exs.map((ex) => (
-                  <option key={ex.id} value={ex.id}>{ex.name}</option>
-                ))}
-              </optgroup>
-            ))}
+
+            {/* ── Mes exercices ── */}
+            {availableUserExercises.length > 0 && (
+              Object.entries(
+                availableUserExercises.reduce<Record<string, Exercise[]>>((acc, ex) => {
+                  const g = ex.muscle_group ?? "other";
+                  acc[g] = [...(acc[g] ?? []), ex];
+                  return acc;
+                }, {})
+              ).map(([group, exs]) => (
+                <optgroup key={`user_${group}`} label={`${MUSCLE_LABEL[group as MuscleGroup] ?? group}`}>
+                  {exs.map((ex) => (
+                    <option key={ex.id} value={ex.id}>{ex.name}</option>
+                  ))}
+                </optgroup>
+              ))
+            )}
+
+            {/* ── Bibliothèque globale ── */}
+            {availableGlobalExercises.length > 0 && (
+              Object.entries(
+                availableGlobalExercises.reduce<Record<string, GlobalExercise[]>>((acc, g) => {
+                  const grp = g.muscle_group ?? "other";
+                  acc[grp] = [...(acc[grp] ?? []), g];
+                  return acc;
+                }, {})
+              ).map(([group, gExs]) => (
+                <optgroup key={`global_${group}`} label={`[Global] ${MUSCLE_LABEL[group as MuscleGroup] ?? group}`}>
+                  {gExs.map((g) => (
+                    <option key={g.id} value={`global_${g.id}`}>{g.name}</option>
+                  ))}
+                </optgroup>
+              ))
+            )}
           </select>
           <button
             type="button"
             onClick={addExercise}
-            disabled={!selectedExId}
-            className="bg-orange-600 hover:bg-orange-500 disabled:opacity-40 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
+            disabled={!selectedExId || importingGlobal}
+            className="shrink-0 bg-orange-600 hover:bg-orange-500 disabled:opacity-40 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
           >
-            +
+            {importingGlobal ? "…" : "+"}
           </button>
         </div>
-        {availableExercises.length === 0 && exercises.length > 0 && (
+        {availableUserExercises.length === 0 && availableGlobalExercises.length === 0 && allUserExercises.length > 0 && (
           <p className="text-[11px] text-zinc-600 mt-2">Tous tes exercices ont été ajoutés.</p>
         )}
-        {exercises.length === 0 && (
+        {allUserExercises.length === 0 && availableGlobalExercises.length === 0 && (
           <p className="text-[11px] text-zinc-500 mt-2">
             Aucun exercice dans ta bibliothèque.{" "}
             <a href="/exercises" className="text-orange-400 hover:underline">Créer →</a>
@@ -424,20 +480,20 @@ export function ManualSessionForm({
           </div>
 
           {/* En-têtes colonnes */}
-          <div className="flex gap-2 text-[9px] text-zinc-600 px-3">
-            <span className="w-4" />
+          <div className="flex gap-2 text-[9px] text-zinc-600 px-3 overflow-hidden">
+            <span className="w-4 shrink-0" />
             {(entry.exercise.tracking_mode === "reps" || entry.exercise.tracking_mode === "reps_duration") && (
               <>
-                {entry.exercise.tracking_mode === "reps" && <span className="flex-1 min-w-[80px]">Poids (kg)</span>}
-                <span className="flex-1 min-w-[60px]">Reps</span>
+                {entry.exercise.tracking_mode === "reps" && <span className="flex-1 truncate">Poids (kg)</span>}
+                <span className="flex-1 truncate">Reps</span>
               </>
             )}
             {(entry.exercise.tracking_mode === "duration" || entry.exercise.tracking_mode === "reps_duration") && (
-              <span className="flex-1 min-w-[90px]">Durée (min)</span>
+              <span className="flex-1 truncate">Durée (min)</span>
             )}
-            <span className="w-16">RPE</span>
-            <span className="w-12">Chauffe</span>
-            <span className="w-6" />
+            <span className="w-14 shrink-0">RPE</span>
+            <span className="w-12 shrink-0">Chauffe</span>
+            <span className="w-6 shrink-0" />
           </div>
 
           {/* Sets */}

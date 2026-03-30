@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { NavBar } from "./NavBar";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 import { ServiceWorkerManager } from "@/components/pwa/ServiceWorkerManager";
+import { SplashDismisser } from "@/components/pwa/SplashDismisser";
 import { ToastProvider } from "@/lib/toast";
 
 export default async function AppLayout({
@@ -24,6 +25,7 @@ export default async function AppLayout({
         </main>
         <InstallPrompt />
         <ServiceWorkerManager />
+        <SplashDismisser />
       </div>
     </ToastProvider>
   );

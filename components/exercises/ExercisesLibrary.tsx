@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { createExerciseAction, deleteExerciseAction, getExerciseUsageAction } from "@/app/actions/exercises";
+import { conjuguerEtre, frPlural } from "@/lib/utils/fr-plural";
 import { resolveTrackingMode } from "@/lib/exercise-validation";
 import type { Exercise, GlobalExercise, ExerciseCategory, MuscleGroup, TrackingMode } from "@/types";
 
@@ -186,10 +187,14 @@ export function ExercisesLibrary({ initial, globalExercises = [] }: { initial: E
         <div className="border border-red-500/30 bg-red-500/10 rounded-xl p-4 space-y-3">
           <p className="text-sm text-white font-medium">Supprimer cet exercice ?</p>
           <p className="text-xs text-zinc-400">
-            {[
-              confirmUsage?.templateCount ? `${confirmUsage.templateCount} programme${confirmUsage.templateCount > 1 ? "s" : ""}` : "",
-              confirmUsage?.setCount      ? `${confirmUsage.setCount} série${confirmUsage.setCount > 1 ? "s" : ""} enregistrée${confirmUsage.setCount > 1 ? "s" : ""}` : "",
-            ].filter(Boolean).join(" et ")} seront également supprimé{(confirmUsage?.setCount ?? 0) + (confirmUsage?.templateCount ?? 0) > 1 ? "s" : ""}.
+            {(() => {
+              const total = (confirmUsage?.setCount ?? 0) + (confirmUsage?.templateCount ?? 0);
+              const parts = [
+                confirmUsage?.templateCount ? `${confirmUsage.templateCount} programme${confirmUsage.templateCount > 1 ? "s" : ""}` : "",
+                confirmUsage?.setCount      ? `${confirmUsage.setCount} série${confirmUsage.setCount > 1 ? "s" : ""} enregistrée${confirmUsage.setCount > 1 ? "s" : ""}` : "",
+              ].filter(Boolean);
+              return `${parts.join(" et ")} ${conjuguerEtre(total)} également ${frPlural(total, "supprimé", "supprimés")}.`;
+            })()}
           </p>
           <div className="flex gap-2">
             <button

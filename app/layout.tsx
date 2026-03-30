@@ -40,7 +40,33 @@ export default function RootLayout({
 }) {
   return (
     <html lang="fr" className="h-full">
-      <body className="min-h-full bg-zinc-950 antialiased">{children}</body>
+      <body className="min-h-full bg-zinc-950 antialiased">
+        {/* Splash screen PWA — visible uniquement en mode standalone via CSS */}
+        <div id="__splash" aria-hidden="true">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/icons/icon-192.png"
+            alt=""
+            style={{ width: 80, height: 80, borderRadius: 16 }}
+          />
+          <p style={{ color: "white", marginTop: 16, fontSize: 18, fontWeight: 600, letterSpacing: "-0.02em" }}>
+            Sport Tracker
+          </p>
+          <div
+            style={{
+              marginTop: 32,
+              width: 24,
+              height: 24,
+              borderRadius: "50%",
+              border: "2px solid #3f3f46",
+              borderTopColor: "white",
+              animation: "spin 0.8s linear infinite",
+            }}
+          />
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+        {children}
+      </body>
     </html>
   );
 }

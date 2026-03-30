@@ -1,10 +1,11 @@
-import { getExercises } from "@/lib/db/exercises";
+import { getExercises, getGlobalExercises } from "@/lib/db/exercises";
 import { getBodyStats } from "@/lib/db/body-stats";
 import { ManualSessionForm } from "@/components/sessions/ManualSessionForm";
 
 export default async function ManualSessionPage() {
-  const [exercises, bodyStats] = await Promise.all([
+  const [exercises, globalExercises, bodyStats] = await Promise.all([
     getExercises(),
+    getGlobalExercises(),
     getBodyStats(),
   ]);
 
@@ -25,7 +26,7 @@ export default async function ManualSessionPage() {
           </p>
         </div>
 
-        <ManualSessionForm exercises={exercises} weightKg={weightKg} />
+        <ManualSessionForm exercises={exercises} globalExercises={globalExercises} weightKg={weightKg} />
       </div>
     </>
   );

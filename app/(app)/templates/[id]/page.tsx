@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { getTemplateById } from "@/lib/db/templates";
-import { getExercises } from "@/lib/db/exercises";
+import { getExercises, getGlobalExercises } from "@/lib/db/exercises";
 import { CreateTemplateForm } from "@/components/templates/CreateTemplateForm";
 import Link from "next/link";
 
@@ -11,9 +11,10 @@ export default async function EditTemplatePage({
 }) {
   const { id } = await params;
 
-  const [template, exercises] = await Promise.all([
+  const [template, exercises, globalExercises] = await Promise.all([
     getTemplateById(id),
     getExercises(),
+    getGlobalExercises(),
   ]);
 
   if (!template) notFound();
@@ -34,6 +35,7 @@ export default async function EditTemplatePage({
         </div>
         <CreateTemplateForm
           exercises={exercises}
+          globalExercises={globalExercises}
           template={template}
           templateExercises={template.template_exercises}
         />

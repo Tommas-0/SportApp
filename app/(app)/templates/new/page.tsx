@@ -1,9 +1,12 @@
-import { getExercises } from "@/lib/db/exercises";
+import { getExercises, getGlobalExercises } from "@/lib/db/exercises";
 import { CreateTemplateForm } from "@/components/templates/CreateTemplateForm";
 import Link from "next/link";
 
 export default async function NewTemplatePage() {
-  const exercises = await getExercises();
+  const [exercises, globalExercises] = await Promise.all([
+    getExercises(),
+    getGlobalExercises(),
+  ]);
 
   return (
     <>
@@ -16,7 +19,7 @@ export default async function NewTemplatePage() {
           <Link href="/templates" className="text-zinc-600 hover:text-zinc-300 transition-colors text-sm">←</Link>
           <h1 className="text-lg font-semibold text-white">Nouveau programme</h1>
         </div>
-        <CreateTemplateForm exercises={exercises} />
+        <CreateTemplateForm exercises={exercises} globalExercises={globalExercises} />
       </div>
     </>
   );

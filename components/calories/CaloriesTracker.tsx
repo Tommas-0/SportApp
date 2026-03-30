@@ -346,7 +346,7 @@ export function CaloriesTracker({
               />
             </div>
             <div>
-              <label className="text-[11px] text-zinc-500 block mb-1">Calories ingérées (kcal)</label>
+              <label className="text-[11px] text-zinc-500 block mb-1 break-words">Calories ingérées (kcal)</label>
               <input
                 type="number"
                 value={kcal}
@@ -461,11 +461,11 @@ export function CaloriesTracker({
               return (
                 <div
                   key={e.id}
-                  className="flex items-center justify-between bg-zinc-800/50 rounded-xl px-3 py-2.5"
+                  className="flex items-center justify-between gap-2 bg-zinc-800/50 rounded-xl px-3 py-2.5"
                 >
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <p className="text-xs text-white font-medium">{fmtDate(e.date)}</p>
-                    <p className="text-[11px] text-zinc-500">
+                    <p className="text-[11px] text-zinc-500 truncate">
                       {e.kcal_ingested.toLocaleString("fr-FR")} kcal ingérées
                       {diff !== null && bal && bal.kcal_burned > 0
                         ? ` · ${diff >= 0 ? "+" : ""}${diff.toLocaleString("fr-FR")} kcal`
@@ -475,7 +475,7 @@ export function CaloriesTracker({
                   </div>
                   <button
                     onClick={() => handleDelete(e.id, e.date)}
-                    className="text-zinc-600 hover:text-red-400 text-xs transition-colors px-2 py-1"
+                    className="shrink-0 text-zinc-600 hover:text-red-400 text-xs transition-colors px-2 py-1"
                   >
                     ✕
                   </button>

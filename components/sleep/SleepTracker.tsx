@@ -316,11 +316,11 @@ export function SleepTracker({ initial }: { initial: DailySleep[] }) {
                   key={e.id}
                   className="flex items-center justify-between bg-zinc-800/50 rounded-xl px-3 py-2.5"
                 >
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm">{LEVEL_ICON[adv.level]}</span>
-                    <div>
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <span className="text-sm shrink-0">{LEVEL_ICON[adv.level]}</span>
+                    <div className="min-w-0">
                       <p className="text-xs text-white font-medium">{fmtDate(e.date)}</p>
-                      <p className="text-[11px] text-zinc-500">
+                      <p className="text-[11px] text-zinc-500 truncate">
                         {e.hours}h
                         {e.quality ? ` · Qualité ${e.quality}/5` : ""}
                         {e.notes ? ` · ${e.notes}` : ""}

@@ -24,3 +24,38 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* ── Splash screen PWA ──────────────────────────────────────── */
+/* Affiché uniquement en mode standalone (PWA installée).       */
+/* Masqué automatiquement par SplashDismisser après hydration.  */
+#__splash {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: #09090b;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  transition: opacity 0.5s ease;
+}
+
+@media (display-mode: standalone) {
+  #__splash {
+    display: flex;
+  }
+}
+
+/* Fallback CSS : disparition automatique après 6s si JS ne charge pas */
+@keyframes splash-fallback {
+  0%   { opacity: 1; }
+  80%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@media (display-mode: standalone) {
+  #__splash {
+    animation: splash-fallback 6s ease forwards;
+  }
+}

@@ -57,7 +57,7 @@ function formToInput(f: FormState) {
 }
 
 const inputCls = "w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500 transition-colors";
-const labelCls = "block text-[11px] text-zinc-500 uppercase tracking-wide mb-1";
+const labelCls = "block text-[11px] text-zinc-500 uppercase tracking-wide mb-1 break-words";
 
 // ─── Composant principal ──────────────────────────────────────
 
@@ -168,9 +168,9 @@ function StatCard({ stat, onEdit, onDelete, deleting }: { stat: BodyStat; onEdit
 
       <div className="px-4 py-3 grid grid-cols-3 gap-2">
         {metrics.map(({ label, value, unit }) => (
-          <div key={label} className="bg-zinc-800/60 rounded-lg px-2.5 py-2">
-            <p className="text-[10px] text-zinc-600 mb-0.5">{label}</p>
-            <p className="text-sm font-medium text-white">{value} <span className="text-zinc-500 text-xs font-normal">{unit}</span></p>
+          <div key={label} className="bg-zinc-800/60 rounded-lg px-2.5 py-2 min-w-0">
+            <p className="text-[10px] text-zinc-600 mb-0.5 truncate">{label}</p>
+            <p className="text-sm font-medium text-white truncate">{value} <span className="text-zinc-500 text-xs font-normal">{unit}</span></p>
           </div>
         ))}
       </div>

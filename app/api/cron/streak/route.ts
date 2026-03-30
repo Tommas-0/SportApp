@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { sendPushNotification } from "@/lib/push";
 
-// Cron Vercel : tourne chaque soir à 20h
-// vercel.json → { "crons": [{ "path": "/api/cron/streak", "schedule": "0 20 * * *" }] }
+// Cron Vercel : tourne à 16h30 UTC = ~18h30 CEST (été) / ~17h30 CET (hiver)
+// vercel.json → { "crons": [{ "path": "/api/cron/streak", "schedule": "30 16 * * *" }] }
 
 export async function GET(req: NextRequest) {
   const secret = req.headers.get("authorization")?.replace("Bearer ", "");
