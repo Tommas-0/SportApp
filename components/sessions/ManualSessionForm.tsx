@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { createManualSessionAction } from "@/app/actions/sessions";
 import { createExerciseAction } from "@/app/actions/exercises";
+import { ExercisePicker } from "@/components/exercises/ExercisePicker";
 import { calculateSetKcal } from "@/lib/utils/fitness";
 import type { Exercise, GlobalExercise, TrackingMode, MuscleGroup, ManualSetInput } from "@/types";
 
@@ -198,20 +199,20 @@ export function ManualSessionForm({
   const [date,            setDate]            = useState(new Date().toISOString().slice(0, 10));
   const [notes,           setNotes]           = useState("");
   const [entries,         setEntries]         = useState<ExerciseEntry[]>([]);
-  const [selectedExId,    setSelectedExId]    = useState("");
+  const [showPicker,      setShowPicker]      = useState(false);
   const [saving,          setSaving]          = useState(false);
   const [error,           setError]           = useState<string | null>(null);
   const [allUserExercises, setAllUserExercises] = useState<Exercise[]>(exercises);
   const [importingGlobal, setImportingGlobal] = useState(false);
 
   // Exercices utilisateur non encore ajoutés à la séance
-  const availableUserExercises = useMemo(
+  const pickerUserExercises = useMemo(
     () => allUserExercises.filter((ex) => !entries.some((e) => e.exercise.id === ex.id)),
     [allUserExercises, entries]
   );
 
   // Exercices globaux non encore dans la bibliothèque perso ni dans la séance
-  const availableGlobalExercises = useMemo(
+  const pickerGlobalExercises = useMemo(
     () => globalExercises.filter(
       (g) =>
         !allUserExercises.some((e) => e.name.toLowerCase() === g.name.toLowerCase()) &&
@@ -225,31 +226,25 @@ export function ManualSessionForm({
     [entries, weightKg]
   );
 
-  async function addExercise() {
-    // Exercice global (pas encore importé) : préfixe "global_"
-    if (selectedExId.startsWith("global_")) {
-      const globalId = selectedExId.slice(7);
-      const g = globalExercises.find((x) => x.id === globalId);
-      if (!g) return;
-      setImportingGlobal(true);
-      const result = await createExerciseAction({
-        name:          g.name,
-        muscle_group:  g.muscle_group,
-        category:      g.category,
-        tracking_mode: g.tracking_mode,
-        notes:         null,
-      });
-      setImportingGlobal(false);
-      if (!result.success) { setError(result.error); return; }
-      setAllUserExercises((prev) => [...prev, result.data].sort((a, b) => a.name.localeCompare(b.name)));
-      setEntries((prev) => [...prev, { exercise: result.data, sets: [emptySet()] }]);
-      setSelectedExId("");
-      return;
-    }
-    const ex = allUserExercises.find((e) => e.id === selectedExId);
-    if (!ex) return;
+  function addExerciseEntry(ex: Exercise) {
+    if (entries.some((e) => e.exercise.id === ex.id)) return; // déjà ajouté
     setEntries((prev) => [...prev, { exercise: ex, sets: [emptySet()] }]);
-    setSelectedExId("");
+    setShowPicker(false);
+  }
+
+  async function importAndSelectExercise(global: GlobalExercise): Promise<Exercise | null> {
+    setImportingGlobal(true);
+    const result = await createExerciseAction({
+      name:          global.name,
+      muscle_group:  global.muscle_group,
+      category:      global.category,
+      tracking_mode: global.tracking_mode,
+      notes:         null,
+    });
+    setImportingGlobal(false);
+    if (!result.success) { setError(result.error); return null; }
+    setAllUserExercises((prev) => [...prev, result.data].sort((a, b) => a.name.localeCompare(b.name)));
+    return result.data;
   }
 
   function removeExercise(idx: number) {
@@ -377,72 +372,38 @@ export function ManualSessionForm({
         </div>
       </div>
 
-      {/* Ajouter exercice */}
-      <div className="border border-zinc-800 bg-zinc-900/60 rounded-xl p-4">
-        <p className="text-[11px] text-zinc-500 uppercase tracking-wide mb-3">
-          Ajouter un exercice
-        </p>
-        <div className="flex gap-2">
-          <select
-            value={selectedExId}
-            onChange={(e) => setSelectedExId(e.target.value)}
-            className="flex-1 min-w-0 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500"
-          >
-            <option value="">Choisir un exercice…</option>
-
-            {/* ── Mes exercices ── */}
-            {availableUserExercises.length > 0 && (
-              Object.entries(
-                availableUserExercises.reduce<Record<string, Exercise[]>>((acc, ex) => {
-                  const g = ex.muscle_group ?? "other";
-                  acc[g] = [...(acc[g] ?? []), ex];
-                  return acc;
-                }, {})
-              ).map(([group, exs]) => (
-                <optgroup key={`user_${group}`} label={`${MUSCLE_LABEL[group as MuscleGroup] ?? group}`}>
-                  {exs.map((ex) => (
-                    <option key={ex.id} value={ex.id}>{ex.name}</option>
-                  ))}
-                </optgroup>
-              ))
-            )}
-
-            {/* ── Bibliothèque globale ── */}
-            {availableGlobalExercises.length > 0 && (
-              Object.entries(
-                availableGlobalExercises.reduce<Record<string, GlobalExercise[]>>((acc, g) => {
-                  const grp = g.muscle_group ?? "other";
-                  acc[grp] = [...(acc[grp] ?? []), g];
-                  return acc;
-                }, {})
-              ).map(([group, gExs]) => (
-                <optgroup key={`global_${group}`} label={`[Global] ${MUSCLE_LABEL[group as MuscleGroup] ?? group}`}>
-                  {gExs.map((g) => (
-                    <option key={g.id} value={`global_${g.id}`}>{g.name}</option>
-                  ))}
-                </optgroup>
-              ))
-            )}
-          </select>
-          <button
-            type="button"
-            onClick={addExercise}
-            disabled={!selectedExId || importingGlobal}
-            className="shrink-0 bg-orange-600 hover:bg-orange-500 disabled:opacity-40 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
-          >
-            {importingGlobal ? "…" : "+"}
-          </button>
-        </div>
-        {availableUserExercises.length === 0 && availableGlobalExercises.length === 0 && allUserExercises.length > 0 && (
-          <p className="text-[11px] text-zinc-600 mt-2">Tous tes exercices ont été ajoutés.</p>
-        )}
-        {allUserExercises.length === 0 && availableGlobalExercises.length === 0 && (
-          <p className="text-[11px] text-zinc-500 mt-2">
+      {/* Ajouter exercice — bouton ouvrant le picker */}
+      <div className="border border-zinc-800 bg-zinc-900/60 rounded-xl p-4 space-y-2">
+        <p className="text-[11px] text-zinc-500 uppercase tracking-wide">Exercices</p>
+        <button
+          type="button"
+          onClick={() => setShowPicker(true)}
+          disabled={importingGlobal}
+          className="w-full border border-dashed border-zinc-700 hover:border-orange-500 rounded-xl py-2.5 text-sm text-zinc-400 hover:text-orange-400 disabled:opacity-50 transition-colors"
+        >
+          {importingGlobal ? "Importation…" : "+ Ajouter un exercice"}
+        </button>
+        {allUserExercises.length === 0 && globalExercises.length === 0 && (
+          <p className="text-[11px] text-zinc-500">
             Aucun exercice dans ta bibliothèque.{" "}
             <a href="/exercises" className="text-orange-400 hover:underline">Créer →</a>
           </p>
         )}
+        {pickerUserExercises.length === 0 && pickerGlobalExercises.length === 0 && entries.length > 0 && (
+          <p className="text-[11px] text-zinc-600">Tous tes exercices ont été ajoutés.</p>
+        )}
       </div>
+
+      {/* ExercisePicker (full-screen overlay) */}
+      {showPicker && (
+        <ExercisePicker
+          exercises={pickerUserExercises}
+          globalExercises={pickerGlobalExercises}
+          onSelect={addExerciseEntry}
+          onImportAndSelect={importAndSelectExercise}
+          onClose={() => setShowPicker(false)}
+        />
+      )}
 
       {/* Liste des exercices */}
       {entries.map((entry, exIdx) => (

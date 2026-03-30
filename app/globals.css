@@ -26,36 +26,27 @@ body {
 }
 
 /* ── Splash screen PWA ──────────────────────────────────────── */
-/* Affiché uniquement en mode standalone (PWA installée).       */
-/* Masqué automatiquement par SplashDismisser après hydration.  */
-#__splash {
-  display: none;
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  background: #09090b;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
-  transition: opacity 0.5s ease;
-}
+/* Le splash est affiché via inline style dans layout.tsx       */
+/* et masqué immédiatement (script inline) si non-standalone.   */
+/* SplashDismisser le masque après hydration en mode standalone. */
 
-@media (display-mode: standalone) {
-  #__splash {
-    display: flex;
-  }
-}
-
-/* Fallback CSS : disparition automatique après 6s si JS ne charge pas */
+/* Fallback : disparition automatique après 5s si JS ne charge pas */
 @keyframes splash-fallback {
-  0%   { opacity: 1; }
-  80%  { opacity: 1; }
-  100% { opacity: 0; }
+  0%,  70% { opacity: 1; }
+  100%      { opacity: 0; }
 }
 
 @media (display-mode: standalone) {
   #__splash {
-    animation: splash-fallback 6s ease forwards;
+    animation: splash-fallback 5s ease forwards;
   }
+}
+
+/* Cache les scrollbars dans les listes horizontales de filtres */
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
 }

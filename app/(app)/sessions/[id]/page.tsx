@@ -3,6 +3,7 @@ import { getBestWeightsBeforeSession } from "@/lib/db/sets";
 import { getCardioHistory } from "@/lib/db/cardio-segments";
 import { notFound } from "next/navigation";
 import { getBodyStats } from "@/lib/db/body-stats";
+import { getExercises, getGlobalExercises } from "@/lib/db/exercises";
 import { SessionDetail } from "@/components/sessions/SessionDetail";
 
 export default async function SessionDetailPage({
@@ -25,11 +26,16 @@ export default async function SessionDetailPage({
     return ex?.category === "cardio" || ex?.tracking_mode === "duration" || ex?.muscle_group === "cardio";
   });
 
-  const [allTimeBests, bodyStats, ...cardioHistories] = await Promise.all([
+  const [allTimeBests, bodyStats, exercises, globalExercises] = await Promise.all([
     getBestWeightsBeforeSession(exerciseIds, session.id),
     getBodyStats(),
-    ...cardioIds.map((eid) => getCardioHistory(eid, 15)),
+    getExercises(),
+    getGlobalExercises().catch(() => []),
   ]);
+
+  const cardioHistories = await Promise.all(
+    cardioIds.map((eid) => getCardioHistory(eid, 15))
+  );
 
   const cardioHistoryMap = Object.fromEntries(
     cardioIds.map((eid, i) => [eid, cardioHistories[i]])
@@ -45,6 +51,8 @@ export default async function SessionDetailPage({
       allTimeBests={allTimeBests}
       bodyweightKg={bodyweightKg}
       cardioHistoryMap={cardioHistoryMap}
+      exercises={exercises}
+      globalExercises={globalExercises}
     />
   );
 }

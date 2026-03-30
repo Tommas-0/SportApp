@@ -41,30 +41,82 @@ export default function RootLayout({
   return (
     <html lang="fr" className="h-full">
       <body className="min-h-full bg-zinc-950 antialiased">
-        {/* Splash screen PWA — visible uniquement en mode standalone via CSS */}
-        <div id="__splash" aria-hidden="true">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/icons/icon-192.png"
-            alt=""
-            style={{ width: 80, height: 80, borderRadius: 16 }}
-          />
-          <p style={{ color: "white", marginTop: 16, fontSize: 18, fontWeight: 600, letterSpacing: "-0.02em" }}>
+
+        {/* ── Splash screen PWA ──────────────────────────────────
+            Affiché par défaut via inline style (avant tout CSS).
+            Masqué immédiatement en mode browser par le script inline.
+            Masqué après hydration par SplashDismisser en mode standalone.
+        ─────────────────────────────────────────────────────── */}
+        <div
+          id="__splash"
+          aria-hidden="true"
+          style={{
+            display:         "flex",
+            position:        "fixed",
+            inset:           0,
+            zIndex:          9999,
+            background:      "linear-gradient(160deg, #0c0c0f 0%, #18181b 60%, #0f0f12 100%)",
+            flexDirection:   "column",
+            alignItems:      "center",
+            justifyContent:  "center",
+            pointerEvents:   "none",
+            transition:      "opacity 0.45s ease",
+          }}
+        >
+          {/* Logo */}
+          <div style={{
+            width: 88, height: 88, borderRadius: 22,
+            overflow: "hidden",
+            boxShadow: "0 0 40px rgba(249,115,22,0.25), 0 8px 32px rgba(0,0,0,0.6)",
+            border: "1px solid rgba(255,255,255,0.08)",
+          }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/icons/icon-192.png" alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          </div>
+
+          {/* App name */}
+          <p style={{
+            color: "white", marginTop: 20, fontSize: 20,
+            fontWeight: 700, letterSpacing: "-0.03em",
+            fontFamily: "system-ui, -apple-system, sans-serif",
+          }}>
             Sport Tracker
           </p>
-          <div
-            style={{
-              marginTop: 32,
-              width: 24,
-              height: 24,
-              borderRadius: "50%",
-              border: "2px solid #3f3f46",
-              borderTopColor: "white",
-              animation: "spin 0.8s linear infinite",
-            }}
-          />
-          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+          <p style={{
+            color: "#71717a", marginTop: 4, fontSize: 13,
+            fontFamily: "system-ui, -apple-system, sans-serif",
+          }}>
+            Chargement…
+          </p>
+
+          {/* Spinner */}
+          <div style={{
+            marginTop: 40, width: 28, height: 28, borderRadius: "50%",
+            border: "2.5px solid #27272a",
+            borderTopColor: "#f97316",
+            animation: "splash-spin 0.75s linear infinite",
+          }} />
+
+          <style>{`
+            @keyframes splash-spin { to { transform: rotate(360deg); } }
+          `}</style>
         </div>
+
+        {/* Script inline : masque le splash immédiatement en mode browser (avant CSS) */}
+        {/* eslint-disable-next-line @next/next/no-before-interactive-script-outside-document */}
+        <script dangerouslySetInnerHTML={{ __html: `
+          (function(){
+            try {
+              var standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
+                || (window.navigator && window.navigator.standalone === true);
+              if (!standalone) {
+                var el = document.getElementById('__splash');
+                if (el) el.style.display = 'none';
+              }
+            } catch(e) {}
+          })();
+        `}} />
+
         {children}
       </body>
     </html>

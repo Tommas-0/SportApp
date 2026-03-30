@@ -12,15 +12,28 @@ export function SplashDismisser() {
     const el = document.getElementById("__splash");
     if (!el) return;
 
-    // Léger délai pour que les composants principaux aient le temps de s'afficher
+    // Vérifier si on est en mode standalone (PWA installée)
+    const isStandalone =
+      (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) ||
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window.navigator as any).standalone === true;
+
+    if (!isStandalone) {
+      // En mode browser : masquer immédiatement (le script inline l'a déjà fait,
+      // mais on s'assure ici au cas où le script n'aurait pas eu le temps de s'exécuter)
+      el.style.display = "none";
+      return;
+    }
+
+    // En mode standalone : laisser le splash visible le temps que l'app soit prête,
+    // puis le faire disparaître en douceur
     const t1 = setTimeout(() => {
       el.style.opacity = "0";
-    }, 200);
+    }, 300);
 
-    // Retrait du DOM après la transition
     const t2 = setTimeout(() => {
       el.style.display = "none";
-    }, 700);
+    }, 800);
 
     return () => {
       clearTimeout(t1);

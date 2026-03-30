@@ -1,14 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { DeleteSessionButton } from "@/components/sessions/DeleteSessionButton";
 import { CardioProgressChart } from "@/components/cardio/CardioProgressChart";
+import { ExercisePicker } from "@/components/exercises/ExercisePicker";
 import { updateSessionAction } from "@/app/actions/sessions";
-import { updateSetAction, deleteSetAction } from "@/app/actions/sets";
+import { updateSetAction, deleteSetAction, logSetAction } from "@/app/actions/sets";
+import { createExerciseAction } from "@/app/actions/exercises";
 import { calculateSetKcal, calculateSessionKcal } from "@/lib/utils/fitness";
-import type { WorkoutSession, WorkoutSet } from "@/types";
+import type { WorkoutSession, WorkoutSet, Exercise, GlobalExercise } from "@/types";
 
 const MUSCLE_LABEL: Record<string, string> = {
   chest: "Pectoraux", back: "Dos", shoulders: "Épaules", arms: "Bras",
@@ -40,16 +42,24 @@ type CardioEntry = { date: string; duration_seconds: number };
 const inputCls =
   "w-full bg-zinc-700 border border-zinc-600 rounded-lg px-2 py-1.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-orange-500";
 
+type AddPhase = "closed" | "picking" | "inputting";
+
+type AddInputs = { reps: string; weight: string; duration: string };
+
 export function SessionDetail({
   session: initialSession,
   allTimeBests,
   bodyweightKg,
   cardioHistoryMap,
+  exercises      = [],
+  globalExercises = [],
 }: {
   session: WorkoutSession;
   allTimeBests: Record<string, number>;
   bodyweightKg: number;
   cardioHistoryMap: Record<string, CardioEntry[]>;
+  exercises?:       Exercise[];
+  globalExercises?: GlobalExercise[];
 }) {
   const router = useRouter();
 
@@ -64,6 +74,79 @@ export function SessionDetail({
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [metaError,  setMetaError]  = useState<string | null>(null);
   const [setError,   setSetError]   = useState<string | null>(null);
+
+  // ── Ajouter un exercice ──────────────────────────────────────
+  const [addPhase,    setAddPhase]    = useState<AddPhase>("closed");
+  const [addEx,       setAddEx]       = useState<Exercise | null>(null);
+  const [addInputs,   setAddInputs]   = useState<AddInputs>({ reps: "", weight: "", duration: "" });
+  const [addLoading,  setAddLoading]  = useState(false);
+  const [addError,    setAddError]    = useState<string | null>(null);
+  const [localExercises, setLocalExercises] = useState<Exercise[]>(exercises);
+
+  // Exercices du picker : exclure ceux déjà dans la séance (car ils sont déjà visibles)
+  const pickerUserExercises = useMemo(
+    () => localExercises.filter((ex) => !sets.some((s) => s.exercise_id === ex.id)),
+    [localExercises, sets]
+  );
+  const pickerGlobalExercises = useMemo(
+    () => globalExercises.filter(
+      (g) => !localExercises.some((e) => e.name.toLowerCase() === g.name.toLowerCase())
+    ),
+    [globalExercises, localExercises]
+  );
+
+  function nextSetNumber(exerciseId: string): number {
+    return sets.filter((s) => s.exercise_id === exerciseId).length + 1;
+  }
+
+  function handleExPicked(ex: Exercise) {
+    setAddEx(ex);
+    setAddPhase("inputting");
+    setAddInputs({ reps: "", weight: "", duration: "" });
+    setAddError(null);
+  }
+
+  async function handleImportAndSelect(global: GlobalExercise): Promise<Exercise | null> {
+    const res = await createExerciseAction({
+      name:          global.name,
+      muscle_group:  global.muscle_group,
+      category:      global.category,
+      tracking_mode: global.tracking_mode,
+      notes:         null,
+    });
+    if (!res.success) return null;
+    setLocalExercises((prev) => [...prev, res.data].sort((a, b) => a.name.localeCompare(b.name)));
+    return res.data;
+  }
+
+  async function handleAddSet() {
+    if (!addEx) return;
+    setAddLoading(true);
+    setAddError(null);
+
+    const reps             = addInputs.reps     ? parseInt(addInputs.reps)                       : undefined;
+    const weight_kg        = addInputs.weight   ? parseFloat(addInputs.weight)                   : undefined;
+    const duration_seconds = addInputs.duration ? Math.round(parseFloat(addInputs.duration) * 60) : undefined;
+
+    const res = await logSetAction({
+      session_id:       initialSession.id,
+      exercise_id:      addEx.id,
+      set_number:       nextSetNumber(addEx.id),
+      tracking_mode:    addEx.tracking_mode ?? "reps",
+      reps,
+      weight_kg,
+      duration_seconds,
+    });
+
+    setAddLoading(false);
+    if (!res.success) { setAddError(res.error); return; }
+
+    // Injecter l'objet exercise dans le set retourné
+    const newSet: WorkoutSet = { ...res.data, exercise: addEx };
+    setSets((prev) => [...prev, newSet]);
+    setAddInputs({ reps: "", weight: "", duration: "" });
+    // Reste en mode "inputting" pour pouvoir ajouter une autre série
+  }
 
   // ── Groupement par exercice ────────────────────────────────
   const byExercise = sets.reduce<Record<string, WorkoutSet[]>>((acc, s) => {
@@ -258,9 +341,10 @@ export function SessionDetail({
         </div>
 
         {/* ── Séries par exercice ── */}
-        {sets.length === 0 ? (
+        {sets.length === 0 && (
           <p className="text-zinc-600 text-sm text-center py-8">Aucune série enregistrée.</p>
-        ) : (
+        )}
+        {sets.length > 0 && (
           <div className="space-y-3">
             {exerciseIds.map((exerciseId) => {
               const exerciseSets = byExercise[exerciseId];
@@ -450,6 +534,94 @@ export function SessionDetail({
               );
             })}
           </div>
+        )}
+
+        {/* ── Ajouter un exercice ── */}
+        {addPhase === "closed" && (
+          <button
+            onClick={() => setAddPhase("picking")}
+            className="w-full border border-dashed border-zinc-700 hover:border-orange-500 rounded-xl py-3 text-xs text-zinc-500 hover:text-orange-400 transition-colors"
+          >
+            + Ajouter un exercice
+          </button>
+        )}
+
+        {/* Formulaire de saisie de série */}
+        {addPhase === "inputting" && addEx && (
+          <div className="border border-zinc-800 bg-zinc-900/60 rounded-xl p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-white">{addEx.name}</p>
+                <p className="text-[10px] text-zinc-500 mt-0.5">
+                  Série #{nextSetNumber(addEx.id)} · cliquer Valider pour enregistrer
+                </p>
+              </div>
+              <button
+                onClick={() => { setAddPhase("closed"); setAddEx(null); setAddError(null); }}
+                className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+              >
+                Fermer
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              {addEx.tracking_mode !== "duration" && (
+                <>
+                  <input
+                    type="number" placeholder="Poids kg" min="0" step="0.5"
+                    value={addInputs.weight}
+                    onChange={(e) => setAddInputs((p) => ({ ...p, weight: e.target.value }))}
+                    className={inputCls}
+                    autoFocus
+                  />
+                  <input
+                    type="number" placeholder="Reps" min="1"
+                    value={addInputs.reps}
+                    onChange={(e) => setAddInputs((p) => ({ ...p, reps: e.target.value }))}
+                    className={inputCls}
+                  />
+                </>
+              )}
+              {(addEx.tracking_mode === "duration" || addEx.tracking_mode === "reps_duration") && (
+                <input
+                  type="number" placeholder="Durée (min)" min="0" step="0.5"
+                  value={addInputs.duration}
+                  onChange={(e) => setAddInputs((p) => ({ ...p, duration: e.target.value }))}
+                  className={`${inputCls} ${addEx.tracking_mode === "duration" ? "col-span-2" : ""}`}
+                  autoFocus={addEx.tracking_mode === "duration"}
+                />
+              )}
+            </div>
+
+            {addError && <p className="text-xs text-red-400">{addError}</p>}
+
+            <div className="flex gap-2">
+              <button
+                onClick={handleAddSet}
+                disabled={addLoading}
+                className="flex-1 bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white text-sm font-medium rounded-lg py-2 transition-colors"
+              >
+                {addLoading ? "…" : "Valider la série"}
+              </button>
+              <button
+                onClick={() => setAddPhase("picking")}
+                className="px-3 text-xs text-zinc-400 hover:text-white border border-zinc-700 rounded-lg py-2 transition-colors"
+              >
+                Autre exercice
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ExercisePicker (full-screen overlay) */}
+        {addPhase === "picking" && (
+          <ExercisePicker
+            exercises={pickerUserExercises}
+            globalExercises={pickerGlobalExercises}
+            onSelect={handleExPicked}
+            onImportAndSelect={handleImportAndSelect}
+            onClose={() => setAddPhase("closed")}
+          />
         )}
       </div>
     </>

@@ -60,6 +60,7 @@ export function ExercisesLibrary({ initial, globalExercises = [] }: { initial: E
   const [forceDeleting,   setForceDeleting]   = useState(false);
   const [error,           setError]           = useState<string | null>(null);
   const [filter,          setFilter]          = useState<MuscleGroup | "all">("all");
+  const [subFilter,       setSubFilter]       = useState<string | "all">("all");
 
   function handleMuscleChange(m: MuscleGroup) {
     setMuscle(m);
@@ -119,8 +120,32 @@ export function ExercisesLibrary({ initial, globalExercises = [] }: { initial: E
     return acc;
   }, {});
 
-  const filteredGroups  = filter === "all" ? grouped : { [filter]: grouped[filter] ?? [] };
   const musclesWithData = MUSCLE_GROUPS.filter((g) => grouped[g.value]?.length > 0);
+
+  // Sous-groupes disponibles pour le groupe sélectionné (Mes exercices)
+  const mySubgroups = (() => {
+    if (filter === "all") return [];
+    const map = new Map<string, { id: string; name: string }>();
+    for (const ex of exercises) {
+      if (ex.muscle_group !== filter) continue;
+      if (ex.muscle_subgroup) map.set(ex.muscle_subgroup.id, ex.muscle_subgroup);
+    }
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  })();
+
+  // Filtrage avec sous-groupe
+  const filteredGroups = (() => {
+    let base = filter === "all" ? exercises : exercises.filter((ex) => ex.muscle_group === filter);
+    if (subFilter !== "all") {
+      base = base.filter((ex) => ex.muscle_subgroup?.id === subFilter);
+    }
+    return base.reduce<Record<string, Exercise[]>>((acc, ex) => {
+      const key = ex.muscle_group ?? "other";
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(ex);
+      return acc;
+    }, {});
+  })();
 
   // Exercices filtrés par recherche seule (pour les compteurs de groupe)
   const globalBySearch = globalExercises.filter(
@@ -339,10 +364,10 @@ export function ExercisesLibrary({ initial, globalExercises = [] }: { initial: E
       {/* ── TAB : Mes exercices (contenu principal) ── */}
       {!globalTab && <>
 
-      {/* Filtres */}
+      {/* Filtres — niveau 1 : groupe musculaire */}
       <div className="flex flex-wrap gap-1.5">
         <button
-          onClick={() => setFilter("all")}
+          onClick={() => { setFilter("all"); setSubFilter("all"); }}
           className={`text-xs px-3 py-1 rounded-full border transition-colors ${
             filter === "all" ? "bg-orange-600 border-orange-600 text-white" : "border-zinc-700 text-zinc-300 hover:text-white"
           }`}
@@ -352,15 +377,40 @@ export function ExercisesLibrary({ initial, globalExercises = [] }: { initial: E
         {musclesWithData.map((g) => (
           <button
             key={g.value}
-            onClick={() => setFilter(g.value)}
+            onClick={() => { setFilter(g.value); setSubFilter("all"); }}
             className={`text-xs px-3 py-1 rounded-full border transition-colors ${
               filter === g.value ? "bg-orange-600 border-orange-600 text-white" : "border-zinc-700 text-zinc-300 hover:text-white"
             }`}
           >
-            {g.label} <span className="text-zinc-500">({grouped[g.value]?.length ?? 0})</span>
+            {g.label} <span className={filter === g.value ? "text-orange-200" : "text-zinc-500"}>({grouped[g.value]?.length ?? 0})</span>
           </button>
         ))}
       </div>
+
+      {/* Filtres — niveau 2 : sous-groupe (si disponibles) */}
+      {mySubgroups.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 pl-1 border-l-2 border-zinc-800">
+          <button
+            onClick={() => setSubFilter("all")}
+            className={`text-[11px] px-2.5 py-0.5 rounded-full border transition-colors ${
+              subFilter === "all" ? "bg-zinc-600 border-zinc-600 text-white" : "border-zinc-700 text-zinc-400 hover:text-white"
+            }`}
+          >
+            Tous
+          </button>
+          {mySubgroups.map((sg) => (
+            <button
+              key={sg.id}
+              onClick={() => setSubFilter(sg.id)}
+              className={`text-[11px] px-2.5 py-0.5 rounded-full border transition-colors ${
+                subFilter === sg.id ? "bg-zinc-600 border-zinc-600 text-white" : "border-zinc-700 text-zinc-400 hover:text-white"
+              }`}
+            >
+              {sg.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Formulaire création */}
       {showForm ? (

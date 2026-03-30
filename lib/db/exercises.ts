@@ -22,11 +22,11 @@ export async function getExercises(): Promise<Exercise[]> {
 
   const { data, error } = await supabase
     .from("exercises")
-    .select("*")
+    .select("*, muscle_subgroup:muscle_subgroups(id, slug, name, group_id)")
     .order("name");
 
   if (error) throw new Error(error.message);
-  return data;
+  return data as Exercise[];
 }
 
 // ─── Création ─────────────────────────────────────────────────
